@@ -117,7 +117,7 @@ size_t uv_handle_size(uv_handle_type type) {
   switch (type) {
     UV_HANDLE_TYPE_MAP(XX)
     default:
-      return -1;
+      return (size_t)-1;
   }
 }
 
@@ -125,7 +125,7 @@ size_t uv_req_size(uv_req_type type) {
   switch(type) {
     UV_REQ_TYPE_MAP(XX)
     default:
-      return -1;
+      return (size_t)-1;
   }
 }
 
@@ -146,10 +146,14 @@ uv_buf_t uv_buf_init(char* base, unsigned int len) {
 
 
 static const char* uv__unknown_err_code(int err) {
+  int ret;
   char buf[32];
   char* copy;
 
-  snprintf(buf, sizeof(buf), "Unknown system error %d", err);
+  ret = snprintf(buf, sizeof(buf), "Unknown system error %d", err);
+  if (ret < 0)
+    return "Unknown system error";
+
   copy = uv__strdup(buf);
 
   return copy != NULL ? copy : "Unknown system error";
@@ -179,7 +183,7 @@ const char* uv_strerror(int err) {
 int uv_ip4_addr(const char* ip, int port, struct sockaddr_in* addr) {
   memset(addr, 0, sizeof(*addr));
   addr->sin_family = AF_INET;
-  addr->sin_port = htons(port);
+  addr->sin_port = htons((unsigned short)port);
   return uv_inet_pton(AF_INET, ip, &(addr->sin_addr.s_addr));
 }
 
@@ -191,7 +195,7 @@ int uv_ip6_addr(const char* ip, int port, struct sockaddr_in6* addr) {
 
   memset(addr, 0, sizeof(*addr));
   addr->sin6_family = AF_INET6;
-  addr->sin6_port = htons(port);
+  addr->sin6_port = htons((unsigned short)port);
 
   zone_index = strchr(ip, '%');
   if (zone_index != NULL) {
@@ -346,16 +350,16 @@ int uv_udp_recv_stop(uv_udp_t* handle) {
 
 void uv_walk(uv_loop_t* loop, uv_walk_cb walk_cb, void* arg) {
   QUEUE queue;
-  QUEUE* q;
+  QUEUE* i;
   uv_handle_t* h;
 
   QUEUE_MOVE(&loop->handle_queue, &queue);
   while (!QUEUE_EMPTY(&queue)) {
-    q = QUEUE_HEAD(&queue);
-    h = QUEUE_DATA(q, uv_handle_t, handle_queue);
+    i = QUEUE_HEAD(&queue);
+    h = QUEUE_DATA(i, uv_handle_t, handle_queue);
 
-    QUEUE_REMOVE(q);
-    QUEUE_INSERT_TAIL(&loop->handle_queue, q);
+    QUEUE_REMOVE(i);
+    QUEUE_INSERT_TAIL(&loop->handle_queue, i);
 
     if (h->flags & UV__HANDLE_INTERNAL) continue;
     walk_cb(h, arg);
@@ -516,7 +520,7 @@ int uv_fs_scandir_next(uv_fs_t* req, uv_dirent_t* ent) {
 
   /* Check to see if req passed */
   if (req->result < 0)
-    return req->result;
+    return (int)req->result;
 
   /* Ptr will be null if req was canceled or no files found */
   if (!req->ptr)

@@ -75,13 +75,15 @@ static void uv_relative_path(const WCHAR* filename,
   *relpath = uv__malloc((relpathlen + 1) * sizeof(WCHAR));
   if (!*relpath)
     uv_fatal_error(ERROR_OUTOFMEMORY, "uv__malloc");
-  wcsncpy(*relpath, filename + dirlen + 1, relpathlen);
+  wcsncpy_s(*relpath, relpathlen + 1, filename + dirlen + 1, relpathlen);
   (*relpath)[relpathlen] = L'\0';
 }
 
 static int uv_split_path(const WCHAR* filename, WCHAR** dir,
     WCHAR** file) {
-  int len = wcslen(filename);
+  int dir_bufsize;
+  int file_bufsize;
+  int len = (int)wcslen(filename);
   int i = len;
   while (i > 0 && filename[--i] != '\\' && filename[i] != '/');
 
@@ -99,22 +101,24 @@ static int uv_split_path(const WCHAR* filename, WCHAR** dir,
       }
     }
 
-    *file = wcsdup(filename);
+    *file = _wcsdup(filename);
   } else {
     if (dir) {
-      *dir = (WCHAR*)uv__malloc((i + 2) * sizeof(WCHAR));
+      dir_bufsize = (i + 2) * sizeof(WCHAR);
+      *dir = (WCHAR*)uv__malloc(dir_bufsize);
       if (!*dir) {
         uv_fatal_error(ERROR_OUTOFMEMORY, "uv__malloc");
       }
-      wcsncpy(*dir, filename, i + 1);
+      wcsncpy_s(*dir, dir_bufsize, filename, i + 1);
       (*dir)[i + 1] = L'\0';
     }
 
-    *file = (WCHAR*)uv__malloc((len - i) * sizeof(WCHAR));
+    file_bufsize = (len - i) * sizeof(WCHAR);
+    *file = (WCHAR*)uv__malloc(file_bufsize);
     if (!*file) {
       uv_fatal_error(ERROR_OUTOFMEMORY, "uv__malloc");
     }
-    wcsncpy(*file, filename + i + 1, len - i - 1);
+    wcsncpy_s(*file, file_bufsize, filename + i + 1, len - i - 1);
     (*file)[len - i - 1] = L'\0';
   }
 
@@ -350,7 +354,7 @@ int uv_fs_event_stop(uv_fs_event_t* handle) {
 static int file_info_cmp(WCHAR* str, WCHAR* file_name, int file_name_len) {
   int str_len;
 
-  str_len = wcslen(str);
+  str_len = (int)wcslen(str);
 
   /*
     Since we only care about equality, return early if the strings
@@ -419,7 +423,7 @@ void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
             if (file_info->Action != FILE_ACTION_REMOVED &&
               file_info->Action != FILE_ACTION_RENAMED_OLD_NAME) {
               /* Construct a full path to the file. */
-              size = wcslen(handle->dirw) +
+              size = (int)wcslen(handle->dirw) +
                 file_info->FileNameLength / sizeof(WCHAR) + 2;
 
               filenamew = (WCHAR*)uv__malloc(size * sizeof(WCHAR));
@@ -427,7 +431,7 @@ void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
                 uv_fatal_error(ERROR_OUTOFMEMORY, "uv__malloc");
               }
 
-              _snwprintf(filenamew, size, L"%s\\%.*s", handle->dirw,
+              _snwprintf_s(filenamew, size, size, L"%s\\%.*s", handle->dirw,
                 file_info->FileNameLength / (DWORD)sizeof(WCHAR),
                 file_info->FileName);
 
@@ -535,6 +539,7 @@ void uv_fs_event_close(uv_loop_t* loop, uv_fs_event_t* handle) {
 
 
 void uv_fs_event_endgame(uv_loop_t* loop, uv_fs_event_t* handle) {
+  (void)loop;
   if ((handle->flags & UV__HANDLE_CLOSING) && !handle->req_pending) {
     assert(!(handle->flags & UV_HANDLE_CLOSED));
 

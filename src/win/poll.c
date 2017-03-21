@@ -135,6 +135,7 @@ static void uv__fast_poll_submit_poll_req(uv_loop_t* loop, uv_poll_t* handle) {
 
 
 static int uv__fast_poll_cancel_poll_req(uv_loop_t* loop, uv_poll_t* handle) {
+  (void)loop;
   AFD_POLL_INFO afd_poll_info;
   DWORD result;
 
@@ -227,11 +228,12 @@ static void uv__fast_poll_process_poll_req(uv_loop_t* loop, uv_poll_t* handle,
 
 
 static int uv__fast_poll_set(uv_loop_t* loop, uv_poll_t* handle, int events) {
+  (void)loop;
   assert(handle->type == UV_POLL);
   assert(!(handle->flags & UV__HANDLE_CLOSING));
   assert((events & ~(UV_READABLE | UV_WRITABLE | UV_DISCONNECT)) == 0);
 
-  handle->events = events;
+  handle->events = (unsigned char)events;
 
   if (handle->events != 0) {
     uv__handle_start(handle);
@@ -471,11 +473,12 @@ static void uv__slow_poll_process_poll_req(uv_loop_t* loop, uv_poll_t* handle,
 
 
 static int uv__slow_poll_set(uv_loop_t* loop, uv_poll_t* handle, int events) {
+  (void)loop;
   assert(handle->type == UV_POLL);
   assert(!(handle->flags & UV__HANDLE_CLOSING));
   assert((events & ~(UV_READABLE | UV_WRITABLE)) == 0);
 
-  handle->events = events;
+  handle->events = (unsigned char)events;
 
   if (handle->events != 0) {
     uv__handle_start(handle);
@@ -634,6 +637,7 @@ int uv_poll_close(uv_loop_t* loop, uv_poll_t* handle) {
 
 
 void uv_poll_endgame(uv_loop_t* loop, uv_poll_t* handle) {
+  (void)loop;
   assert(handle->flags & UV__HANDLE_CLOSING);
   assert(!(handle->flags & UV_HANDLE_CLOSED));
 

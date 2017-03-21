@@ -56,7 +56,10 @@ static int uv_timer_compare(uv_timer_t* a, uv_timer_t* b) {
 }
 
 
+#pragma warning(push)
+#pragma warning(disable: 28182)
 RB_GENERATE_STATIC(uv_timer_tree_s, uv_timer_s, tree_entry, uv_timer_compare);
+#pragma warning(pop)
 
 
 int uv_timer_init(uv_loop_t* loop, uv_timer_t* handle) {
@@ -69,6 +72,7 @@ int uv_timer_init(uv_loop_t* loop, uv_timer_t* handle) {
 
 
 void uv_timer_endgame(uv_loop_t* loop, uv_timer_t* handle) {
+  (void)loop;
   if (handle->flags & UV__HANDLE_CLOSING) {
     assert(!(handle->flags & UV_HANDLE_CLOSED));
     uv__handle_close(handle);

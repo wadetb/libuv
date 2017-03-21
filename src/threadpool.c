@@ -42,6 +42,7 @@ static volatile int initialized;
 
 
 static void uv__cancelled(struct uv__work* w) {
+  (void)w;
   abort();
 }
 
@@ -80,7 +81,8 @@ static void worker(void* arg) {
       break;
 
     w = QUEUE_DATA(q, struct uv__work, wq);
-    w->work(w);
+    if (w->work)
+      w->work(w);
 
     uv_mutex_lock(&w->loop->wq_mutex);
     w->work = NULL;  /* Signal uv_cancel() that the work req is done
@@ -129,11 +131,11 @@ UV_DESTRUCTOR(static void cleanup(void)) {
 
 static void init_threads(void) {
   unsigned int i;
-  const char* val;
+  char val[4];
+  size_t val_len;
 
   nthreads = ARRAY_SIZE(default_threads);
-  val = getenv("UV_THREADPOOL_SIZE");
-  if (val != NULL)
+  if (getenv_s(&val_len, val, ARRAY_SIZE(val), "UV_THREADPOOL_SIZE") == 0)
     nthreads = atoi(val);
   if (nthreads == 0)
     nthreads = 1;
@@ -199,6 +201,7 @@ void uv__work_submit(uv_loop_t* loop,
 
 
 static int uv__work_cancel(uv_loop_t* loop, uv_req_t* req, struct uv__work* w) {
+  (void)req;
   int cancelled;
 
   uv_mutex_lock(&mutex);
@@ -227,20 +230,20 @@ static int uv__work_cancel(uv_loop_t* loop, uv_req_t* req, struct uv__work* w) {
 void uv__work_done(uv_async_t* handle) {
   struct uv__work* w;
   uv_loop_t* loop;
-  QUEUE* q;
-  QUEUE wq;
+  QUEUE* iq;
+  QUEUE mywq;
   int err;
 
   loop = container_of(handle, uv_loop_t, wq_async);
   uv_mutex_lock(&loop->wq_mutex);
-  QUEUE_MOVE(&loop->wq, &wq);
+  QUEUE_MOVE(&loop->wq, &mywq);
   uv_mutex_unlock(&loop->wq_mutex);
 
-  while (!QUEUE_EMPTY(&wq)) {
-    q = QUEUE_HEAD(&wq);
-    QUEUE_REMOVE(q);
+  while (!QUEUE_EMPTY(&mywq)) {
+    iq = QUEUE_HEAD(&mywq);
+    QUEUE_REMOVE(iq);
 
-    w = container_of(q, struct uv__work, wq);
+    w = container_of(iq, struct uv__work, wq);
     err = (w->work == uv__cancelled) ? UV_ECANCELED : 0;
     w->done(w, err);
   }

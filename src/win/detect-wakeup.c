@@ -14,6 +14,9 @@ void uv__init_detect_system_wakeup() {
 static ULONG CALLBACK uv__system_resume_callback(PVOID Context,
                                                  ULONG Type,
                                                  PVOID Setting) {
+  (void)Context;
+  (void)Setting;
+  
   if (Type == PBT_APMRESUMESUSPEND || Type == PBT_APMRESUMEAUTOMATIC)
     uv__wake_all_loops();
 

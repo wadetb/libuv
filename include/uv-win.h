@@ -186,7 +186,7 @@ typedef int (WSAAPI* LPFN_WSARECVFROM)
              LPWSAOVERLAPPED_COMPLETION_ROUTINE completion_routine);
 
 #ifndef _NTDEF_
-  typedef LONG NTSTATUS;
+  typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
   typedef NTSTATUS *PNTSTATUS;
 #endif
 

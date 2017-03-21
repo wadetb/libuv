@@ -88,6 +88,7 @@ INLINE static uv_req_t* uv_overlapped_to_req(OVERLAPPED* overlapped) {
 
 
 INLINE static void uv_insert_pending_req(uv_loop_t* loop, uv_req_t* req) {
+  assert(req != NULL);
   req->next_req = NULL;
   if (loop->pending_reqs_tail) {
 #ifdef _DEBUG

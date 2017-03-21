@@ -191,6 +191,7 @@ static int uv__create_stdio_pipe_pair(uv_loop_t* loop,
 
 
 static int uv__duplicate_handle(uv_loop_t* loop, HANDLE handle, HANDLE* dup) {
+  (void)loop;
   HANDLE current_process;
 
 
@@ -293,7 +294,7 @@ int uv__stdio_create(uv_loop_t* loop,
   }
 
   for (i = 0; i < count; i++) {
-    uv_stdio_container_t fdopt;
+    uv_stdio_container_t fdopt = { 0 };
     if (i < options->stdio_count) {
       fdopt = options->stdio[i];
     } else {

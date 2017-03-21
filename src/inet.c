@@ -59,7 +59,7 @@ static int inet_ntop4(const unsigned char *src, char *dst, size_t size) {
   if (l <= 0 || (size_t) l >= size) {
     return UV_ENOSPC;
   }
-  strncpy(dst, tmp, size);
+  strncpy_s(dst, size, tmp, size);
   dst[size - 1] = '\0';
   return 0;
 }
@@ -136,7 +136,7 @@ static int inet_ntop6(const unsigned char *src, char *dst, size_t size) {
       tp += strlen(tp);
       break;
     }
-    tp += sprintf(tp, "%x", words[i]);
+    tp += snprintf(tp, 4, "%x", words[i]);
   }
   /* Was it a trailing run of 0x00's? */
   if (best.base != -1 && (best.base + best.len) == ARRAY_SIZE(words))
@@ -149,7 +149,7 @@ static int inet_ntop6(const unsigned char *src, char *dst, size_t size) {
   if ((size_t)(tp - tmp) > size) {
     return UV_ENOSPC;
   }
-  strcpy(dst, tmp);
+  strcpy_s(dst, size, tmp);
   return 0;
 }
 
@@ -168,7 +168,7 @@ int uv_inet_pton(int af, const char* src, void* dst) {
     p = strchr(src, '%');
     if (p != NULL) {
       s = tmp;
-      len = p - src;
+      len = (int)(p - src);
       if (len > UV__INET6_ADDRSTRLEN-1)
         return UV_EINVAL;
       memcpy(s, src, len);
@@ -190,18 +190,19 @@ static int inet_pton4(const char *src, unsigned char *dst) {
 
   saw_digit = 0;
   octets = 0;
-  *(tp = tmp) = 0;
+  tp = tmp;
+  *tp = 0;
   while ((ch = *src++) != '\0') {
     const char *pch;
 
     if ((pch = strchr(digits, ch)) != NULL) {
-      unsigned int nw = *tp * 10 + (pch - digits);
+      unsigned int nw = *tp * 10 + (int)(pch - digits);
 
       if (saw_digit && *tp == 0)
         return UV_EINVAL;
       if (nw > 255)
         return UV_EINVAL;
-      *tp = nw;
+      *tp = (unsigned char)nw;
       if (!saw_digit) {
         if (++octets > 4)
           return UV_EINVAL;
@@ -291,7 +292,7 @@ static int inet_pton6(const char *src, unsigned char *dst) {
      * Since some memmove()'s erroneously fail to handle
      * overlapping regions, we'll do the shift by hand.
      */
-    const int n = tp - colonp;
+    const int n = (int)(tp - colonp);
     int i;
 
     if (tp == endp)

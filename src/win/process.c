@@ -169,6 +169,7 @@ static WCHAR* search_path_join_test(const WCHAR* dir,
                                     const WCHAR* cwd,
                                     size_t cwd_len) {
   WCHAR *result, *result_pos;
+  size_t result_len;
   DWORD attrs;
   if (dir_len > 2 && dir[0] == L'\\' && dir[1] == L'\\') {
     /* It's a UNC path so ignore cwd */
@@ -196,43 +197,50 @@ static WCHAR* search_path_join_test(const WCHAR* dir,
   }
 
   /* Allocate buffer for output */
-  result = result_pos = (WCHAR*)uv__malloc(sizeof(WCHAR) *
-      (cwd_len + 1 + dir_len + 1 + name_len + 1 + ext_len + 1));
+  result_len = cwd_len + 1 + dir_len + 1 + name_len + 1 + ext_len + 1;
+  result = result_pos = (WCHAR*)uv__malloc(sizeof(WCHAR) * result_len);
 
   /* Copy cwd */
-  wcsncpy(result_pos, cwd, cwd_len);
+  wcsncpy_s(result_pos, result_len, cwd, cwd_len);
   result_pos += cwd_len;
+  result_len -= cwd_len;
 
   /* Add a path separator if cwd didn't end with one */
   if (cwd_len && wcsrchr(L"\\/:", result_pos[-1]) == NULL) {
     result_pos[0] = L'\\';
     result_pos++;
+	result_len--;
   }
 
   /* Copy dir */
-  wcsncpy(result_pos, dir, dir_len);
+  wcsncpy_s(result_pos, result_len, dir, dir_len);
   result_pos += dir_len;
+  result_len -= dir_len;
 
   /* Add a separator if the dir didn't end with one */
   if (dir_len && wcsrchr(L"\\/:", result_pos[-1]) == NULL) {
     result_pos[0] = L'\\';
-    result_pos++;
+	result_pos++;
+	result_len--;
   }
 
   /* Copy filename */
-  wcsncpy(result_pos, name, name_len);
+  wcsncpy_s(result_pos, result_len, name, name_len);
   result_pos += name_len;
+  result_len -= name_len;
 
   if (ext_len) {
     /* Add a dot if the filename didn't end with one */
     if (name_len && result_pos[-1] != '.') {
       result_pos[0] = L'.';
-      result_pos++;
+	  result_pos++;
+	  result_len--;
     }
 
     /* Copy extension */
-    wcsncpy(result_pos, ext, ext_len);
-    result_pos += ext_len;
+    wcsncpy_s(result_pos, result_len, ext, ext_len);
+	result_pos += ext_len;
+	result_len -= ext_len;
   }
 
   /* Null terminator */
@@ -409,6 +417,7 @@ static WCHAR* search_path(const WCHAR *file,
       dir_end = wcschr(dir_start, L';');
       if (dir_end == NULL) {
         dir_end = wcschr(dir_start, L'\0');
+        assert(dir_end);
       }
 
       /* If the slice is zero-length, don't bother */
@@ -444,7 +453,7 @@ static WCHAR* search_path(const WCHAR *file,
  * Quotes command line arguments
  * Returns a pointer to the end (next char to be written) of the buffer
  */
-WCHAR* quote_cmd_arg(const WCHAR *source, WCHAR *target) {
+WCHAR* quote_cmd_arg(const WCHAR *source, WCHAR *target, int target_len) {
   size_t len = wcslen(source);
   size_t i;
   int quote_hit;
@@ -459,7 +468,7 @@ WCHAR* quote_cmd_arg(const WCHAR *source, WCHAR *target) {
 
   if (NULL == wcspbrk(source, L" \t\"")) {
     /* No quotation needed */
-    wcsncpy(target, source, len);
+    wcsncpy_s(target, target_len, source, len);
     target += len;
     return target;
   }
@@ -470,7 +479,7 @@ WCHAR* quote_cmd_arg(const WCHAR *source, WCHAR *target) {
      * quote marks around the whole thing.
      */
     *(target++) = L'"';
-    wcsncpy(target, source, len);
+    wcsncpy_s(target, target_len - 1, source, len);
     target += len;
     *(target++) = L'"';
     return target;
@@ -511,7 +520,7 @@ WCHAR* quote_cmd_arg(const WCHAR *source, WCHAR *target) {
     }
   }
   target[0] = L'\0';
-  wcsrev(start);
+  _wcsrev(start);
   *(target++) = L'"';
   return target;
 }
@@ -585,11 +594,11 @@ int make_program_args(char** args, int verbatim_arguments, WCHAR** dst_ptr) {
 
     if (verbatim_arguments) {
       /* Copy verbatim. */
-      wcscpy(pos, temp_buffer);
+      wcscpy_s(pos, (int) (dst + dst_len - pos), temp_buffer);
       pos += arg_len - 1;
     } else {
       /* Quote/escape, if needed. */
-      pos = quote_cmd_arg(temp_buffer, pos);
+      pos = quote_cmd_arg(temp_buffer, pos, (int) (dst + dst_len - pos));
     }
 
     *pos++ = *(arg + 1) ? L' ' : L'\0';
@@ -624,10 +633,12 @@ int env_strncmp(const wchar_t* a, int na, const wchar_t* b) {
   }
   b_eq = wcschr(b, L'=');
   assert(b_eq);
-  nb = b_eq - b;
+  nb = (int)(b_eq - b);
 
-  A = alloca((na+1) * sizeof(wchar_t));
-  B = alloca((nb+1) * sizeof(wchar_t));
+  A = _malloca((na+1) * sizeof(wchar_t));
+  B = _malloca((nb+1) * sizeof(wchar_t));
+  if (!A) abort();
+  if (!B) abort();
 
   r = LCMapStringW(LOCALE_INVARIANT, LCMAP_UPPERCASE, a, na, A, na);
   assert(r==na);
@@ -685,11 +696,12 @@ int make_program_env(char* env_block[], WCHAR** dst_ptr) {
   WCHAR* dst_copy;
   WCHAR** ptr_copy;
   WCHAR** env_copy;
-  DWORD* required_vars_value_len = alloca(n_required_vars * sizeof(DWORD*));
+  DWORD* required_vars_value_len = _malloca(n_required_vars * sizeof(DWORD*));
+  if (!required_vars_value_len)
+	  abort();
 
   /* first pass: determine size in UTF-16 */
   for (env = env_block; *env; env++) {
-    int len;
     if (strchr(*env, '=')) {
       len = MultiByteToWideChar(CP_UTF8,
                                 0,
@@ -710,7 +722,9 @@ int make_program_env(char* env_block[], WCHAR** dst_ptr) {
   if (!dst_copy) {
     return ERROR_OUTOFMEMORY;
   }
-  env_copy = alloca(env_block_count * sizeof(WCHAR*));
+  env_copy = _malloca(env_block_count * sizeof(WCHAR*));
+  if (!env_copy)
+	  abort();
 
   ptr = dst_copy;
   ptr_copy = env_copy;
@@ -732,7 +746,7 @@ int make_program_env(char* env_block[], WCHAR** dst_ptr) {
     }
   }
   *ptr_copy = NULL;
-  assert(env_len == ptr - dst_copy);
+  assert(env_len == (size_t)(ptr - dst_copy));
 
   /* sort our (UTF-16) copy */
   qsort(env_copy, env_block_count-1, sizeof(wchar_t*), qsort_wcscmp);
@@ -744,7 +758,7 @@ int make_program_env(char* env_block[], WCHAR** dst_ptr) {
       cmp = -1;
     } else {
       cmp = env_strncmp(required_vars[i].wide_eq,
-                       required_vars[i].len,
+                        (int)required_vars[i].len,
                         *ptr_copy);
     }
     if (cmp < 0) {
@@ -780,26 +794,26 @@ int make_program_env(char* env_block[], WCHAR** dst_ptr) {
       cmp = -1;
     } else {
       cmp = env_strncmp(required_vars[i].wide_eq,
-                        required_vars[i].len,
+                        (int)required_vars[i].len,
                         *ptr_copy);
     }
     if (cmp < 0) {
       /* missing required var */
       len = required_vars_value_len[i];
       if (len) {
-        wcscpy(ptr, required_vars[i].wide_eq);
+        wcscpy_s(ptr, (int) (env_len - (ptr - dst)), required_vars[i].wide_eq);
         ptr += required_vars[i].len;
         var_size = GetEnvironmentVariableW(required_vars[i].wide,
                                            ptr,
                                            (int) (env_len - (ptr - dst)));
-        if (var_size != len-1) { /* race condition? */
+        if ((int)var_size != len-1) { /* race condition? */
           uv_fatal_error(GetLastError(), "GetEnvironmentVariableW");
         }
       }
       i++;
     } else {
       /* copy var from env_block */
-      len = wcslen(*ptr_copy) + 1;
+      len = (int)wcslen(*ptr_copy) + 1;
       wmemcpy(ptr, *ptr_copy, len);
       ptr_copy++;
       if (cmp == 0)
@@ -808,7 +822,7 @@ int make_program_env(char* env_block[], WCHAR** dst_ptr) {
   }
 
   /* Terminate with an extra NULL. */
-  assert(env_len == (ptr - dst));
+  assert(env_len == (size_t)(ptr - dst));
   *ptr = L'\0';
 
   uv__free(dst_copy);
@@ -867,7 +881,8 @@ void uv_process_proc_exit(uv_loop_t* loop, uv_process_t* handle) {
 
   /* Unregister from process notification. */
   if (handle->wait_handle != INVALID_HANDLE_VALUE) {
-    UnregisterWait(handle->wait_handle);
+    if (!UnregisterWait(handle->wait_handle))
+		abort();
     handle->wait_handle = INVALID_HANDLE_VALUE;
   }
 
@@ -911,6 +926,7 @@ void uv_process_close(uv_loop_t* loop, uv_process_t* handle) {
 
 
 void uv_process_endgame(uv_loop_t* loop, uv_process_t* handle) {
+  (void)loop;
   assert(!handle->exit_cb_pending);
   assert(handle->flags & UV__HANDLE_CLOSING);
   assert(!(handle->flags & UV_HANDLE_CLOSED));
@@ -1111,7 +1127,7 @@ int uv_spawn(uv_loop_t* loop,
        * there would be no way for libuv applications run under job control
        * to spawn processes at all.
        */
-      DWORD err = GetLastError();
+      err = GetLastError();
       if (err != ERROR_ACCESS_DENIED)
         uv_fatal_error(err, "AssignProcessToJobObject");
     }

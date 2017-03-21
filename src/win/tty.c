@@ -296,8 +296,8 @@ static void uv_tty_capture_initial_style(CONSOLE_SCREEN_BUFFER_INFO* info) {
 int uv_tty_set_mode(uv_tty_t* tty, uv_tty_mode_t mode) {
   DWORD flags;
   unsigned char was_reading;
-  uv_alloc_cb alloc_cb;
-  uv_read_cb read_cb;
+  uv_alloc_cb alloc_cb = NULL;
+  uv_read_cb read_cb = NULL;
   int err;
 
   if (!(tty->flags & UV_HANDLE_TTY_READABLE)) {
@@ -394,7 +394,8 @@ static void CALLBACK uv_tty_post_raw_read(void* data, BOOLEAN didTimeout) {
   handle = (uv_tty_t*) req->data;
   loop = handle->loop;
 
-  UnregisterWait(handle->tty.rd.read_raw_wait);
+  if (!UnregisterWait(handle->tty.rd.read_raw_wait))
+    abort();
   handle->tty.rd.read_raw_wait = NULL;
 
   SET_REQ_SUCCESS(req);
@@ -787,8 +788,9 @@ void uv_process_tty_read_raw_req(uv_loop_t* loop, uv_tty_t* handle,
         if (KEV.uChar.UnicodeChar >= 0xDC00 &&
             KEV.uChar.UnicodeChar < 0xE000) {
           /* UTF-16 surrogate pair */
-          WCHAR utf16_buffer[2] = { handle->tty.rd.last_utf16_high_surrogate,
-                                    KEV.uChar.UnicodeChar};
+          WCHAR utf16_buffer[2];
+		  utf16_buffer[0] = handle->tty.rd.last_utf16_high_surrogate;
+		  utf16_buffer[1] = KEV.uChar.UnicodeChar;
           char_len = WideCharToMultiByte(CP_UTF8,
                                          0,
                                          utf16_buffer,
@@ -946,7 +948,7 @@ void uv_process_tty_read_line_req(uv_loop_t* loop, uv_tty_t* handle,
     if (!(handle->flags & UV_HANDLE_CANCELLATION_PENDING)) {
       /* Read successful */
       /* TODO: read unicode, convert to utf-8 */
-      DWORD bytes = req->u.io.overlapped.InternalHigh;
+      DWORD bytes = (DWORD)req->u.io.overlapped.InternalHigh;
       handle->read_cb((uv_stream_t*) handle, bytes, &buf);
     } else {
       handle->flags &= ~UV_HANDLE_CANCELLATION_PENDING;
@@ -1088,7 +1090,7 @@ static int uv__cancel_read_console(uv_tty_t* handle) {
   record.Event.KeyEvent.wRepeatCount = 1;
   record.Event.KeyEvent.wVirtualKeyCode = VK_RETURN;
   record.Event.KeyEvent.wVirtualScanCode =
-    MapVirtualKeyW(VK_RETURN, MAPVK_VK_TO_VSC);
+    (WORD)MapVirtualKeyW(VK_RETURN, MAPVK_VK_TO_VSC);
   record.Event.KeyEvent.uChar.UnicodeChar = L'\r';
   record.Event.KeyEvent.dwControlKeyState = 0;
   if (!WriteConsoleInputW(handle->handle, &record, 1, &written))
@@ -1136,8 +1138,9 @@ static void uv_tty_update_virtual_window(CONSOLE_SCREEN_BUFFER_INFO* info) {
 
 
 static COORD uv_tty_make_real_coord(uv_tty_t* handle,
-    CONSOLE_SCREEN_BUFFER_INFO* info, int x, unsigned char x_relative, int y,
-    unsigned char y_relative) {
+    CONSOLE_SCREEN_BUFFER_INFO* info, int x, int x_relative, int y,
+    int y_relative) {
+  (void)handle;
   COORD result;
 
   uv_tty_update_virtual_window(info);
@@ -1430,7 +1433,7 @@ static int uv_tty_set_style(uv_tty_t* handle, DWORD* error) {
 
     } else if (arg >= 30 && arg <= 37) {
       /* Set foreground color */
-      fg_color = arg - 30;
+      fg_color = (char)arg - 30;
 
     } else if (arg == 39) {
       /* Default text color */
@@ -1439,7 +1442,7 @@ static int uv_tty_set_style(uv_tty_t* handle, DWORD* error) {
 
     } else if (arg >= 40 && arg <= 47) {
       /* Set background color */
-      bg_color = arg - 40;
+      bg_color = (char)arg - 40;
 
     } else if (arg ==  49) {
       /* Default background color */
@@ -1449,12 +1452,12 @@ static int uv_tty_set_style(uv_tty_t* handle, DWORD* error) {
     } else if (arg >= 90 && arg <= 97) {
       /* Set bold foreground color */
       fg_bright = 1;
-      fg_color = arg - 90;
+      fg_color = (char)arg - 90;
 
     } else if (arg >= 100 && arg <= 107) {
       /* Set bold background color */
       bg_bright = 1;
-      bg_color = arg - 100;
+      bg_color = (char)arg - 100;
 
     }
   }
@@ -1541,7 +1544,7 @@ static int uv_tty_save_state(uv_tty_t* handle, unsigned char save_attributes,
   uv_tty_update_virtual_window(&info);
 
   handle->tty.wr.saved_position.X = info.dwCursorPosition.X;
-  handle->tty.wr.saved_position.Y = info.dwCursorPosition.Y - uv_tty_virtual_offset;
+  handle->tty.wr.saved_position.Y = info.dwCursorPosition.Y - (short)uv_tty_virtual_offset;
   handle->flags |= UV_HANDLE_TTY_SAVED_POSITION;
 
   if (save_attributes) {
@@ -1620,7 +1623,7 @@ static int uv_tty_write_bufs(uv_tty_t* handle,
                              DWORD* error) {
   /* We can only write 8k characters at a time. Windows can't handle */
   /* much more characters in a single console write anyway. */
-  WCHAR utf16_buf[MAX_CONSOLE_CHAR];
+  static WCHAR utf16_buf[MAX_CONSOLE_CHAR];
   WCHAR* utf16_buffer;
   DWORD utf16_buf_used = 0;
   unsigned int i, len, max_len, pos;
@@ -1853,7 +1856,7 @@ static int uv_tty_write_bufs(uv_tty_t* handle,
               }
 
                handle->tty.wr.ansi_csi_argv[handle->tty.wr.ansi_csi_argc - 1] =
-                   (unsigned short) value + (utf8_codepoint - '0');
+                   (unsigned short) value + ((unsigned short)utf8_codepoint - '0');
                continue;
             }
 
@@ -2159,7 +2162,7 @@ int uv__tty_try_write(uv_tty_t* handle,
   if (uv_tty_write_bufs(handle, bufs, nbufs, &error))
     return uv_translate_sys_error(error);
 
-  return uv__count_bufs(bufs, nbufs);
+  return (int)uv__count_bufs(bufs, nbufs);
 }
 
 
@@ -2190,7 +2193,7 @@ void uv_tty_close(uv_tty_t* handle) {
   if (handle->u.fd == -1)
     CloseHandle(handle->handle);
   else
-    close(handle->u.fd);
+    _close(handle->u.fd);
 
   if (handle->flags & UV_HANDLE_READING)
     uv_tty_read_stop(handle);
@@ -2243,6 +2246,9 @@ void uv_tty_endgame(uv_loop_t* loop, uv_tty_t* handle) {
 /* TODO: remove me */
 void uv_process_tty_accept_req(uv_loop_t* loop, uv_tty_t* handle,
     uv_req_t* raw_req) {
+  (void)loop;
+  (void)handle;
+  (void)raw_req;
   abort();
 }
 
@@ -2250,6 +2256,9 @@ void uv_process_tty_accept_req(uv_loop_t* loop, uv_tty_t* handle,
 /* TODO: remove me */
 void uv_process_tty_connect_req(uv_loop_t* loop, uv_tty_t* handle,
     uv_connect_t* req) {
+  (void)loop;
+  (void)handle;
+  (void)req;
   abort();
 }
 

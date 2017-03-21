@@ -39,4 +39,8 @@ int snprintf(char* buf, size_t len, const char* fmt, ...) {
   return n;
 }
 
+#else
+
+static int __empty;
+
 #endif

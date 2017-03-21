@@ -26,7 +26,7 @@ static int uv__dlerror(uv_lib_t* lib, int errorno);
 
 
 int uv_dlopen(const char* filename, uv_lib_t* lib) {
-  WCHAR filename_w[32768];
+  WCHAR filename_w[1024];
 
   lib->handle = NULL;
   lib->errmsg = NULL;
@@ -64,7 +64,12 @@ void uv_dlclose(uv_lib_t* lib) {
 
 
 int uv_dlsym(uv_lib_t* lib, const char* name, void** ptr) {
-  *ptr = (void*) GetProcAddress(lib->handle, name);
+  union {
+    FARPROC fp;
+    void *p;
+  } u;
+  u.fp = GetProcAddress(lib->handle, name);
+  *ptr = u.p;
   return uv__dlerror(lib, *ptr ? 0 : GetLastError());
 }
 
@@ -75,8 +80,9 @@ const char* uv_dlerror(const uv_lib_t* lib) {
 
 
 static void uv__format_fallback_error(uv_lib_t* lib, int errorno){
-  DWORD_PTR args[1] = { (DWORD_PTR) errorno };
   LPSTR fallback_error = "error: %1!d!";
+  DWORD_PTR args[1];
+  args[0] = (DWORD_PTR)errorno;
 
   FormatMessageA(FORMAT_MESSAGE_FROM_STRING |
                  FORMAT_MESSAGE_ARGUMENT_ARRAY |

@@ -316,8 +316,8 @@ int WSAAPI uv_wsarecv_workaround(SOCKET socket, WSABUF* buffers,
     apc_context = NULL;
   }
 
-  iosb->Status = STATUS_PENDING;
-  iosb->Pointer = 0;
+  iosb->u.Status = STATUS_PENDING;
+  iosb->u.Pointer = 0;
 
   status = pNtDeviceIoControlFile((HANDLE) socket,
                                   overlapped->hEvent,
@@ -414,8 +414,8 @@ int WSAAPI uv_wsarecvfrom_workaround(SOCKET socket, WSABUF* buffers,
     apc_context = NULL;
   }
 
-  iosb->Status = STATUS_PENDING;
-  iosb->Pointer = 0;
+  iosb->u.Status = STATUS_PENDING;
+  iosb->u.Pointer = 0;
 
   status = pNtDeviceIoControlFile((HANDLE) socket,
                                   overlapped->hEvent,
@@ -476,7 +476,7 @@ int WSAAPI uv_wsarecvfrom_workaround(SOCKET socket, WSABUF* buffers,
 
 int WSAAPI uv_msafd_poll(SOCKET socket, AFD_POLL_INFO* info_in,
     AFD_POLL_INFO* info_out, OVERLAPPED* overlapped) {
-  IO_STATUS_BLOCK iosb;
+  IO_STATUS_BLOCK iosb = { 0 };
   IO_STATUS_BLOCK* iosb_ptr;
   HANDLE event = NULL;
   void* apc_context;
@@ -506,7 +506,7 @@ int WSAAPI uv_msafd_poll(SOCKET socket, AFD_POLL_INFO* info_in,
     apc_context = NULL;
   }
 
-  iosb_ptr->Status = STATUS_PENDING;
+  iosb_ptr->u.Status = STATUS_PENDING;
   status = pNtDeviceIoControlFile((HANDLE) socket,
                                   event,
                                   NULL,
@@ -531,7 +531,7 @@ int WSAAPI uv_msafd_poll(SOCKET socket, AFD_POLL_INFO* info_in,
         return SOCKET_ERROR;
       }
 
-      status = iosb.Status;
+      status = iosb.u.Status;
     }
 
     CloseHandle(event);

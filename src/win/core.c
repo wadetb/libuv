@@ -47,6 +47,7 @@ static uv_once_t uv_init_guard_ = UV_ONCE_INIT;
 UV_THREAD_LOCAL int uv__crt_assert_enabled = TRUE;
 
 static int uv__crt_dbg_report_handler(int report_type, char *message, int *ret_val) {
+  (void)message;
   if (uv__crt_assert_enabled || report_type != _CRT_ASSERT)
     return FALSE;
 
@@ -73,6 +74,11 @@ UV_THREAD_LOCAL int uv__crt_assert_enabled = FALSE;
 static void uv__crt_invalid_parameter_handler(const wchar_t* expression,
     const wchar_t* function, const wchar_t * file, unsigned int line,
     uintptr_t reserved) {
+  (void)expression;
+  (void)function;
+  (void)file;
+  (void)line;
+  (void)reserved;
   /* No-op. */
 }
 #endif
@@ -325,16 +331,21 @@ void uv__loop_close(uv_loop_t* loop) {
 
 
 int uv__loop_configure(uv_loop_t* loop, uv_loop_option option, va_list ap) {
+  (void)loop;
+  (void)option;
+  (void)ap;
   return UV_ENOSYS;
 }
 
 
 int uv_backend_fd(const uv_loop_t* loop) {
+  (void)loop;
   return -1;
 }
 
 
 int uv_loop_fork(uv_loop_t* loop) {
+  (void)loop;
   return UV_ENOSYS;
 }
 

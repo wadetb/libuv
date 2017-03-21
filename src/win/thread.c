@@ -193,7 +193,11 @@ int uv_thread_equal(const uv_thread_t* t1, const uv_thread_t* t2) {
 
 
 int uv_mutex_init(uv_mutex_t* mutex) {
-  InitializeCriticalSection(mutex);
+  __try {
+    InitializeCriticalSection(mutex);
+  } __except (GetExceptionCode() == STATUS_NO_MEMORY ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+    abort();
+  }
   return 0;
 }
 
@@ -229,7 +233,11 @@ int uv_rwlock_init(uv_rwlock_t* rwlock) {
   rwlock->state_.write_semaphore_ = handle;
 
   /* Initialize the critical section protecting the reader count. */
-  InitializeCriticalSection(&rwlock->state_.num_readers_lock_);
+  __try {
+    InitializeCriticalSection(&rwlock->state_.num_readers_lock_);
+  } __except (GetExceptionCode() == STATUS_NO_MEMORY ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+	  abort();
+  }
 
   /* Initialize the reader count. */
   rwlock->state_.num_readers_ = 0;
@@ -367,7 +375,6 @@ int uv_sem_trywait(uv_sem_t* sem) {
     return UV_EAGAIN;
 
   abort();
-  return -1; /* Satisfy the compiler. */
 }
 
 
@@ -384,7 +391,11 @@ static int uv_cond_fallback_init(uv_cond_t* cond) {
   /* Initialize the count to 0. */
   cond->fallback.waiters_count = 0;
 
-  InitializeCriticalSection(&cond->fallback.waiters_count_lock);
+  __try {
+    InitializeCriticalSection(&cond->fallback.waiters_count_lock);
+  } __except (GetExceptionCode() == STATUS_NO_MEMORY ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+    abort();
+  }
 
   /* Create an auto-reset event. */
   cond->fallback.signal_event = CreateEvent(NULL,  /* no security */
@@ -442,6 +453,7 @@ static void uv_cond_fallback_destroy(uv_cond_t* cond) {
 
 
 static void uv_cond_condvar_destroy(uv_cond_t* cond) {
+  (void)cond;
   /* nothing to do */
 }
 
@@ -510,10 +522,9 @@ static int uv_cond_wait_helper(uv_cond_t* cond, uv_mutex_t* mutex,
     DWORD dwMilliseconds) {
   DWORD result;
   int last_waiter;
-  HANDLE handles[2] = {
-    cond->fallback.signal_event,
-    cond->fallback.broadcast_event
-  };
+  HANDLE handles[2];
+  handles[0] = cond->fallback.signal_event;
+  handles[1] = cond->fallback.broadcast_event;
 
   /* Avoid race conditions. */
   EnterCriticalSection(&cond->fallback.waiters_count_lock);
@@ -552,7 +563,6 @@ static int uv_cond_wait_helper(uv_cond_t* cond, uv_mutex_t* mutex,
     return UV_ETIMEDOUT;
 
   abort();
-  return -1; /* Satisfy the compiler. */
 }
 
 

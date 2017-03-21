@@ -191,6 +191,7 @@ void uv_udp_close(uv_loop_t* loop, uv_udp_t* handle) {
 
 
 void uv_udp_endgame(uv_loop_t* loop, uv_udp_t* handle) {
+  (void)loop;
   if (handle->flags & UV__HANDLE_CLOSING &&
       handle->reqs_pending == 0) {
     assert(!(handle->flags & UV_HANDLE_CLOSED));
@@ -922,5 +923,10 @@ int uv__udp_try_send(uv_udp_t* handle,
                      unsigned int nbufs,
                      const struct sockaddr* addr,
                      unsigned int addrlen) {
+  (void)addrlen;
+  (void)addr;
+  (void)nbufs;
+  (void)bufs;
+  (void)handle;
   return UV_ENOSYS;
 }

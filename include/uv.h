@@ -1393,8 +1393,8 @@ UV_EXTERN int uv_cwd(char* buffer, size_t* size);
 
 UV_EXTERN int uv_chdir(const char* dir);
 
-UV_EXTERN uint64_t uv_get_free_memory(void);
-UV_EXTERN uint64_t uv_get_total_memory(void);
+UV_EXTERN int64_t uv_get_free_memory(void);
+UV_EXTERN int64_t uv_get_total_memory(void);
 
 UV_EXTERN uint64_t uv_hrtime(void);
 

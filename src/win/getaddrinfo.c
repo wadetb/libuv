@@ -123,8 +123,8 @@ static void uv__getaddrinfo_done(struct uv__work* w, int status) {
     /* first calculate required length */
     addrinfow_ptr = req->addrinfow;
     while (addrinfow_ptr != NULL) {
-      addrinfo_len += addrinfo_struct_len +
-          ALIGNED_SIZE(addrinfow_ptr->ai_addrlen);
+      addrinfo_len += (int)addrinfo_struct_len +
+          (int)ALIGNED_SIZE(addrinfow_ptr->ai_addrlen);
       if (addrinfow_ptr->ai_canonname != NULL) {
         name_len = WideCharToMultiByte(CP_UTF8,
                                        0,
@@ -197,7 +197,7 @@ static void uv__getaddrinfo_done(struct uv__work* w, int status) {
                                          NULL);
           assert(name_len > 0);
           addrinfo_ptr->ai_canonname = cur_ptr;
-          cur_ptr += ALIGNED_SIZE(name_len);
+          cur_ptr += ALIGNED_SIZE((uint64_t)name_len);
         }
         assert(cur_ptr <= alloc_ptr + addrinfo_len);
 

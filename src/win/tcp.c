@@ -46,6 +46,7 @@ const unsigned int uv_simultaneous_server_accepts = 32;
 static char uv_zero_[] = "";
 
 static int uv__tcp_nodelay(uv_tcp_t* handle, SOCKET socket, int enable) {
+  (void)handle;
   if (setsockopt(socket,
                  IPPROTO_TCP,
                  TCP_NODELAY,
@@ -58,6 +59,7 @@ static int uv__tcp_nodelay(uv_tcp_t* handle, SOCKET socket, int enable) {
 
 
 static int uv__tcp_keepalive(uv_tcp_t* handle, SOCKET socket, int enable, unsigned int delay) {
+  (void)handle;
   if (setsockopt(socket,
                  SOL_SOCKET,
                  SO_KEEPALIVE,
@@ -251,7 +253,8 @@ void uv_tcp_endgame(uv_loop_t* loop, uv_tcp_t* handle) {
         for (i = 0; i < uv_simultaneous_server_accepts; i++) {
           req = &handle->tcp.serv.accept_reqs[i];
           if (req->wait_handle != INVALID_HANDLE_VALUE) {
-            UnregisterWait(req->wait_handle);
+            if (!UnregisterWait(req->wait_handle))
+                abort();
             req->wait_handle = INVALID_HANDLE_VALUE;
           }
           if (req->event_handle) {
@@ -268,7 +271,8 @@ void uv_tcp_endgame(uv_loop_t* loop, uv_tcp_t* handle) {
     if (handle->flags & UV_HANDLE_CONNECTION &&
         handle->flags & UV_HANDLE_EMULATE_IOCP) {
       if (handle->read_req.wait_handle != INVALID_HANDLE_VALUE) {
-        UnregisterWait(handle->read_req.wait_handle);
+        if (!UnregisterWait(handle->read_req.wait_handle))
+          abort();
         handle->read_req.wait_handle = INVALID_HANDLE_VALUE;
       }
       if (handle->read_req.event_handle) {
@@ -366,7 +370,7 @@ static void CALLBACK post_completion(void* context, BOOLEAN timed_out) {
   assert(!timed_out);
 
   if (!PostQueuedCompletionStatus(handle->loop->iocp,
-                                  req->u.io.overlapped.InternalHigh,
+                                  (DWORD)req->u.io.overlapped.InternalHigh,
                                   0,
                                   &req->u.io.overlapped)) {
     uv_fatal_error(GetLastError(), "PostQueuedCompletionStatus");
@@ -385,7 +389,7 @@ static void CALLBACK post_write_completion(void* context, BOOLEAN timed_out) {
   assert(!timed_out);
 
   if (!PostQueuedCompletionStatus(handle->loop->iocp,
-                                  req->u.io.overlapped.InternalHigh,
+                                  (DWORD)req->u.io.overlapped.InternalHigh,
                                   0,
                                   &req->u.io.overlapped)) {
     uv_fatal_error(GetLastError(), "PostQueuedCompletionStatus");
@@ -1081,7 +1085,8 @@ void uv_process_tcp_write_req(uv_loop_t* loop, uv_tcp_t* handle,
 
   if (handle->flags & UV_HANDLE_EMULATE_IOCP) {
     if (req->wait_handle != INVALID_HANDLE_VALUE) {
-      UnregisterWait(req->wait_handle);
+      if (!UnregisterWait(req->wait_handle))
+        abort();
       req->wait_handle = INVALID_HANDLE_VALUE;
     }
     if (req->event_handle) {
@@ -1370,6 +1375,7 @@ static int uv_tcp_try_cancel_io(uv_tcp_t* tcp) {
 
 
 void uv_tcp_close(uv_loop_t* loop, uv_tcp_t* tcp) {
+  (void)loop;
   int close_socket = 1;
 
   if (tcp->flags & UV_HANDLE_READ_PENDING) {

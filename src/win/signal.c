@@ -40,7 +40,11 @@ int uv__signal_start(uv_signal_t* handle,
                      int oneshot);
 
 void uv_signals_init() {
-  InitializeCriticalSection(&uv__signal_lock);
+  __try {
+    InitializeCriticalSection(&uv__signal_lock);
+  } __except (GetExceptionCode() == STATUS_NO_MEMORY ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+    abort();
+  }
   if (!SetConsoleCtrlHandler(uv__signal_control_handler, TRUE))
     abort();
 }
@@ -64,7 +68,10 @@ static int uv__signal_compare(uv_signal_t* w1, uv_signal_t* w2) {
 }
 
 
+#pragma warning(push)
+#pragma warning(disable: 28182)
 RB_GENERATE_STATIC(uv_signal_tree_s, uv_signal_s, tree_entry, uv__signal_compare);
+#pragma warning(pop)
 
 
 /*
@@ -265,6 +272,7 @@ void uv_signal_close(uv_loop_t* loop, uv_signal_t* handle) {
 
 
 void uv_signal_endgame(uv_loop_t* loop, uv_signal_t* handle) {
+  (void)loop;
   assert(handle->flags & UV__HANDLE_CLOSING);
   assert(!(handle->flags & UV_HANDLE_CLOSED));
 

@@ -411,6 +411,7 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)                   \
   while ((parent = RB_PARENT(elm, field)) != NULL &&                          \
       RB_COLOR(parent, field) == RB_RED) {                                    \
     gparent = RB_PARENT(parent, field);                                       \
+    assert(gparent);                                                          \
     if (parent == RB_LEFT(gparent, field)) {                                  \
       tmp = RB_RIGHT(gparent, field);                                         \
       if (tmp && RB_COLOR(tmp, field) == RB_RED) {                            \
@@ -441,10 +442,12 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)                   \
         parent = elm;                                                         \
         elm = tmp;                                                            \
       }                                                                       \
+      assert(parent);                                                         \
       RB_SET_BLACKRED(parent, gparent, field);                                \
       RB_ROTATE_LEFT(head, gparent, tmp, field);                              \
     }                                                                         \
   }                                                                           \
+  assert(head->rbh_root);                                                     \
   RB_COLOR(head->rbh_root, field) = RB_BLACK;                                 \
 }                                                                             \
                                                                               \

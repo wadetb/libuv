@@ -81,7 +81,11 @@ void uv__util_init() {
   LARGE_INTEGER perf_frequency;
 
   /* Initialize process title access mutex. */
-  InitializeCriticalSection(&process_title_lock);
+  __try {
+    InitializeCriticalSection(&process_title_lock);
+  } __except (GetExceptionCode() == STATUS_NO_MEMORY ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+    abort();
+  }
 
   /* Retrieve high-resolution timer frequency
    * and precompute its reciprocal.
@@ -164,7 +168,7 @@ int uv_cwd(char* buffer, size_t* size) {
   utf16_len = GetCurrentDirectoryW(MAX_PATH, utf16_buffer);
   if (utf16_len == 0) {
     return uv_translate_sys_error(GetLastError());
-  } else if (utf16_len > MAX_PATH) {
+  } else if (utf16_len >= MAX_PATH) {
     /* This should be impossible;  however the CRT has a code path to deal */
     /* with this scenario, so I added a check anyway. */
     return UV_EIO;
@@ -299,7 +303,7 @@ void uv_loadavg(double avg[3]) {
 }
 
 
-uint64_t uv_get_free_memory(void) {
+int64_t uv_get_free_memory(void) {
   MEMORYSTATUSEX memory_status;
   memory_status.dwLength = sizeof(memory_status);
 
@@ -311,7 +315,7 @@ uint64_t uv_get_free_memory(void) {
 }
 
 
-uint64_t uv_get_total_memory(void) {
+int64_t uv_get_total_memory(void) {
   MEMORYSTATUSEX memory_status;
   memory_status.dwLength = sizeof(memory_status);
 
@@ -327,14 +331,14 @@ int uv_parent_pid() {
   int parent_pid = -1;
   HANDLE handle;
   PROCESSENTRY32 pe;
-  DWORD current_pid = GetCurrentProcessId();
+  DWORD pid = uv_current_pid();
 
   pe.dwSize = sizeof(PROCESSENTRY32);
   handle = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
   if (Process32First(handle, &pe)) {
     do {
-      if (pe.th32ProcessID == current_pid) {
+      if (pe.th32ProcessID == pid) {
         parent_pid = pe.th32ParentProcessID;
         break;
       }
@@ -355,6 +359,7 @@ int uv_current_pid() {
 
 
 char** uv_setup_args(int argc, char** argv) {
+  (void)argc;
   return argv;
 }
 
@@ -650,10 +655,11 @@ int uv_cpu_info(uv_cpu_info_t** cpu_infos_ptr, int* cpu_count_ptr) {
     DWORD cpu_brand_size = sizeof(cpu_brand);
     size_t len;
 
-    len = _snwprintf(key_name,
-                     ARRAY_SIZE(key_name),
-                     L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\%d",
-                     i);
+    len = _snwprintf_s(key_name,
+                       ARRAY_SIZE(key_name),
+                       ARRAY_SIZE(key_name),
+                       L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\%d",
+                       i);
 
     assert(len > 0 && len < ARRAY_SIZE(key_name));
 
@@ -714,8 +720,10 @@ int uv_cpu_info(uv_cpu_info_t** cpu_infos_ptr, int* cpu_count_ptr) {
 
  error:
   /* This is safe because the cpu_infos array is zeroed on allocation. */
-  for (i = 0; i < cpu_count; i++)
-    uv__free(cpu_infos[i].model);
+  if (cpu_infos) {
+    for (i = 0; i < cpu_count; i++)
+      uv__free(cpu_infos[i].model);
+  }
 
   uv__free(cpu_infos);
   uv__free(sppi);
@@ -741,7 +749,7 @@ static int is_windows_version_or_greater(DWORD os_major,
                                          WORD service_pack_minor) {
   OSVERSIONINFOEX osvi;
   DWORDLONG condition_mask = 0;
-  int op = VER_GREATER_EQUAL;
+  BYTE op = VER_GREATER_EQUAL;
 
   /* Initialize the OSVERSIONINFOEX structure. */
   ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
@@ -1073,6 +1081,7 @@ int uv_interface_addresses(uv_interface_address_t** addresses_ptr,
 
 void uv_free_interface_addresses(uv_interface_address_t* addresses,
     int count) {
+  (void)count;
   uv__free(addresses);
 }
 
@@ -1172,7 +1181,7 @@ int uv_os_homedir(char* buffer, size_t* size) {
                                   path,
                                   -1,
                                   buffer,
-                                  *size,
+                                  (int)*size,
                                   NULL,
                                   NULL);
 
@@ -1247,7 +1256,7 @@ int uv_os_tmpdir(char* buffer, size_t* size) {
                                 path,
                                 -1,
                                 buffer,
-                                *size,
+                                (int)*size,
                                 NULL,
                                 NULL);
 
@@ -1380,7 +1389,7 @@ int uv__getpwuid_r(uv_passwd_t* pwd) {
   if (OpenProcessToken(GetCurrentProcess(), TOKEN_READ, &token) == 0)
     return uv_translate_sys_error(GetLastError());
 
-  bufsize = sizeof(path);
+  bufsize = ARRAY_SIZE(path);
   if (!GetUserProfileDirectoryW(token, path, &bufsize)) {
     r = GetLastError();
     CloseHandle(token);
@@ -1395,7 +1404,7 @@ int uv__getpwuid_r(uv_passwd_t* pwd) {
   CloseHandle(token);
 
   /* Get the username using GetUserNameW() */
-  bufsize = sizeof(username);
+  bufsize = ARRAY_SIZE(username);
   if (!GetUserNameW(username, &bufsize)) {
     r = GetLastError();
 
@@ -1434,7 +1443,7 @@ int uv_os_get_passwd(uv_passwd_t* pwd) {
 
 
 int uv_os_getenv(const char* name, char* buffer, size_t* size) {
-  wchar_t var[MAX_ENV_VAR_LENGTH];
+  static wchar_t var[MAX_ENV_VAR_LENGTH];
   wchar_t* name_w;
   DWORD bufsize;
   size_t len;
@@ -1477,7 +1486,7 @@ int uv_os_getenv(const char* name, char* buffer, size_t* size) {
                                 var,
                                 -1,
                                 buffer,
-                                *size,
+                                (int)*size,
                                 NULL,
                                 NULL);
 
