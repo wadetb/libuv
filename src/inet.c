@@ -59,7 +59,11 @@ static int inet_ntop4(const unsigned char *src, char *dst, size_t size) {
   if (l <= 0 || (size_t) l >= size) {
     return UV_ENOSPC;
   }
+#ifdef _WIN32
   strncpy_s(dst, size, tmp, size);
+#else
+  strncpy(dst, tmp, size);
+#endif
   dst[size - 1] = '\0';
   return 0;
 }
@@ -149,7 +153,11 @@ static int inet_ntop6(const unsigned char *src, char *dst, size_t size) {
   if ((size_t)(tp - tmp) > size) {
     return UV_ENOSPC;
   }
+#ifdef _WIN32
   strcpy_s(dst, size, tmp);
+#else
+  strcpy(dst, tmp);
+#endif
   return 0;
 }
 

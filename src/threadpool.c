@@ -131,12 +131,19 @@ UV_DESTRUCTOR(static void cleanup(void)) {
 
 static void init_threads(void) {
   unsigned int i;
-  char val[4];
-  size_t val_len;
 
   nthreads = ARRAY_SIZE(default_threads);
+#ifdef _WIN32
+  char val[4];
+  size_t val_len;
   if (getenv_s(&val_len, val, ARRAY_SIZE(val), "UV_THREADPOOL_SIZE") == 0)
     nthreads = atoi(val);
+#else
+  const char *val;
+  val = getenv("UV_THREADPOOL_SIZE");
+  if (val != NULL)
+    nthreads = atoi(val);
+#endif
   if (nthreads == 0)
     nthreads = 1;
   if (nthreads > MAX_THREADPOOL_SIZE)

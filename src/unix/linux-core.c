@@ -503,7 +503,7 @@ int uv_exepath(char* buffer, size_t* size) {
 }
 
 
-uint64_t uv_get_free_memory(void) {
+int64_t uv_get_free_memory(void) {
   struct sysinfo info;
 
   if (sysinfo(&info) == 0)
@@ -512,7 +512,7 @@ uint64_t uv_get_free_memory(void) {
 }
 
 
-uint64_t uv_get_total_memory(void) {
+int64_t uv_get_total_memory(void) {
   struct sysinfo info;
 
   if (sysinfo(&info) == 0)
