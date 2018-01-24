@@ -658,7 +658,7 @@ int uv_cpu_info(uv_cpu_info_t** cpu_infos_ptr, int* cpu_count_ptr) {
     len = _snwprintf_s(key_name,
                        ARRAY_SIZE(key_name),
                        ARRAY_SIZE(key_name),
-                       L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\%d",
+                       L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\%u",
                        i);
 
     assert(len > 0 && len < ARRAY_SIZE(key_name));

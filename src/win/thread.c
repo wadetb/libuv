@@ -207,6 +207,8 @@ void uv_mutex_destroy(uv_mutex_t* mutex) {
 }
 
 
+#pragma warning(push)
+#pragma warning(disable: 26135)
 void uv_mutex_lock(uv_mutex_t* mutex) {
   EnterCriticalSection(mutex);
 }
@@ -223,6 +225,7 @@ int uv_mutex_trylock(uv_mutex_t* mutex) {
 void uv_mutex_unlock(uv_mutex_t* mutex) {
   LeaveCriticalSection(mutex);
 }
+#pragma warning(pop)
 
 
 int uv_rwlock_init(uv_rwlock_t* rwlock) {
