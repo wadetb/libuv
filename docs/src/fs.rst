@@ -277,6 +277,12 @@ API
 
     Limited equivalent to :man:`sendfile(2)`.
 
+    .. warning::
+        This function can send fewer than `length` bytes, `result` contains the 
+        number of bytes sent. 
+        It can also return `EAGAIN`, in which case no data was sent; call `uv_fs_sendfile` 
+        to reattempt.
+
     .. versionchanged:: 2.0.0 replace uv_file with uv_os_fd_t
 
 .. c:function:: int uv_fs_access(uv_loop_t* loop, uv_fs_t* req, const char* path, int mode, uv_fs_cb cb)

@@ -413,6 +413,10 @@ int uv__stream_open(uv_stream_t* stream, int fd, int flags) {
     /* TODO Use delay the user passed in. */
     if ((stream->flags & UV_TCP_KEEPALIVE) && uv__tcp_keepalive(fd, 1, 60))
       return UV__ERR(errno);
+
+    printf("====================== stream->flags: %x\n", stream->flags);
+    if ((stream->flags & UV_TCP_ZEROCOPY) && uv__tcp_zerocopy(fd, 1))
+      return UV__ERR(errno);
   }
 
 #if defined(__APPLE__)
@@ -845,7 +849,9 @@ start:
 #endif
   } else {
     do {
-      if (iovcnt == 1) {
+      if (stream->flags & UV_TCP_ZEROCOPY) {
+        n = send(uv__stream_fd(stream),iov[0].iov_base, iov[0].iov_len, MSG_ZEROCOPY);
+      } else if (iovcnt == 1) {
         n = write(uv__stream_fd(stream), iov[0].iov_base, iov[0].iov_len);
       } else {
         n = writev(uv__stream_fd(stream), iov, iovcnt);

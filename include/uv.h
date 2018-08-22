@@ -591,6 +591,7 @@ UV_EXTERN int uv_tcp_keepalive(uv_tcp_t* handle,
                                int enable,
                                unsigned int delay);
 UV_EXTERN int uv_tcp_simultaneous_accepts(uv_tcp_t* handle, int enable);
+UV_EXTERN int uv_tcp_zerocopy(uv_tcp_t* handle, int enable);
 
 enum uv_tcp_flags {
   /* Used with uv_tcp_bind, when an IPv6 address is used. */

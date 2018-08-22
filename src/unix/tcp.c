@@ -390,6 +390,13 @@ int uv__tcp_keepalive(int fd, int on, unsigned int delay) {
 }
 
 
+int uv__tcp_zerocopy(int fd, int on) {
+  if (setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &on, sizeof(on)))
+    return UV__ERR(errno);
+  return 0;
+}
+
+
 int uv_tcp_nodelay(uv_tcp_t* handle, int on) {
   int err;
 
@@ -435,6 +442,24 @@ int uv_tcp_simultaneous_accepts(uv_tcp_t* handle, int enable) {
     handle->flags &= ~UV_TCP_SINGLE_ACCEPT;
   else
     handle->flags |= UV_TCP_SINGLE_ACCEPT;
+  return 0;
+}
+
+
+int uv_tcp_zerocopy(uv_tcp_t* handle, int on) {
+  int err;
+
+  if (uv__stream_fd(handle) != -1) {
+    err = uv__tcp_zerocopy(uv__stream_fd(handle), on);
+    if (err)
+      return err;
+  }
+
+  if (on)
+    handle->flags |= UV_TCP_ZEROCOPY;
+  else
+    handle->flags &= ~UV_TCP_ZEROCOPY;
+
   return 0;
 }
 
